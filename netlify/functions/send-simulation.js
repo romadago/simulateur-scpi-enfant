@@ -1,4 +1,4 @@
-// Fichier : netlify/functions/send-simulation.js (Version avec mention légale)
+// Fichier : netlify/functions/send-simulation.js (Version corrigée)
 
 const { Resend } = require('resend');
 
@@ -10,25 +10,24 @@ exports.handler = async function(event) {
   try {
     const resend = new Resend(process.env.RESEND_API_KEY);
     const data = JSON.parse(event.body);
-    const { email, values, results, selectedProfil, simulatorTitle } = data;
+    const { email, values, results, simulatorTitle } = data;
 
     // --- Formatage des résultats pour l'email ---
-    const repartitionHtml = `
-        <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 8px;">
-            <h4 style="margin-top: 0; color: #0056b3;">Répartition de votre épargne mensuelle conseillée</h4>
-            <p>Capacité d'épargne estimée : <strong>${Math.round(results.capaciteEpargne).toLocaleString('fr-FR')} € / mois</strong></p>
-            <p>Part sécurisée (${results.pourcentages.securise}%) : <strong>${Math.round(results.repartition.securise).toLocaleString('fr-FR')} € / mois</strong></p>
-            <p>Part dynamique (${results.pourcentages.dynamique}%) : <strong>${Math.round(results.repartition.dynamique).toLocaleString('fr-FR')} € / mois</strong></p>
-        </div>
-    `;
-
-    const projectionHtml = `
-        <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 8px;">
-             <h4 style="margin-top: 0; color: #0056b3;">Projection du capital</h4>
-             <p>En suivant cette stratégie, votre capital dans ${values.dureeProjection} ans est estimé à :</p>
-             <p style="font-size: 20px; font-weight: bold;">${Math.round(results.capitalProjete).toLocaleString('fr-FR')} €</p>
-        </div>
-    `;
+    let resultsHtml = '';
+    for (const profil in results) {
+        const r = results[profil];
+        const gainReelStyle = r.gainReel >= 0 ? 'color: #28a745;' : 'color: #d9534f;';
+        
+        resultsHtml += `
+            <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 8px;">
+                <h4 style="margin-top: 0; color: #0056b3;">Profil ${profil}</h4>
+                <p>Capital final (valeur nominale) : <strong>${Math.round(r.valeurNominale).toLocaleString('fr-FR')} €</strong></p>
+                <p>Total de vos versements : <strong>${Math.round(r.totalInvesti).toLocaleString('fr-FR')} €</strong></p>
+                <p>Pouvoir d'achat final (valeur réelle) : <strong>${Math.round(r.valeurReelle).toLocaleString('fr-FR')} €</strong></p>
+                <p style="${gainReelStyle}">Gain réel (après inflation) : <strong>${r.gainReel >= 0 ? '+' : ''} ${Math.round(r.gainReel).toLocaleString('fr-FR')} €</strong></p>
+            </div>
+        `;
+    }
 
     // --- Envoi de l'email ---
     await resend.emails.send({
@@ -58,8 +57,7 @@ exports.handler = async function(event) {
           <p>Cordialement,<br>L'équipe Aeternia Patrimoine</p>
 
           <hr style="border: none; border-top: 1px solid #eee; margin-top: 20px;">
-
-          /* --- MODIFICATION : Ajout de la mention légale --- */
+          
           <p style="font-size: 10px; color: #777; text-align: center; margin-top: 20px;">
             Les informations et résultats fournis par ce simulateur sont donnés à titre indicatif et non contractuel. Ils ne constituent pas un conseil en investissement et sont basés sur les hypothèses que vous avez renseignées.
           </p>
