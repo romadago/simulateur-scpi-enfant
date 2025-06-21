@@ -1,0 +1,3 @@
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["resend", "@react-email/render", "html-to-text", "js-beautify", "prettier", "deepmerge", "config-chain", "editorconfig", "dom-serializer", "@selderee/plugin-htmlparser2", "selderee"]
