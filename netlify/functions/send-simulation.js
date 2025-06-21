@@ -1,8 +1,8 @@
-// Fichier : netlify/functions/send-simulation.js (Version simplifiée et fonctionnelle)
+// Fichier corrigé : netlify/functions/send-simulation.js
 
-const { Resend } = require('resend');
+import { Resend } from 'resend';
 
-exports.handler = async function(event) {
+export async function handler(event) {
   // Accepter uniquement les requêtes POST
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
@@ -16,15 +16,15 @@ exports.handler = async function(event) {
     // --- Formatage simple des résultats pour l'email ---
     let resultsHtml = '';
     for (const profil in results) {
-        const r = results[profil];
-        resultsHtml += `
-            <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 8px;">
-                <h4 style="margin-top: 0; color: #0056b3;">Profil ${profil}</h4>
-                <p>Capital final (dès maintenant) : <strong>${Math.round(r.valeurFinaleMaintenant).toLocaleString('fr-FR')} €</strong></p>
-                <p>Capital final (reporté de ${values.delaiReport} ans) : <strong>${Math.round(r.valeurFinaleReport).toLocaleString('fr-FR')} €</strong></p>
-                <p style="color: #d9534f;">Coût du report : <strong>- ${Math.round(r.coutDuReport).toLocaleString('fr-FR')} €</strong></p>
-            </div>
-        `;
+      const r = results[profil];
+      resultsHtml += `
+        <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 8px;">
+          <h4 style="margin-top: 0; color: #0056b3;">Profil ${profil}</h4>
+          <p>Capital final (dès maintenant) : <strong>${Math.round(r.valeurFinaleMaintenant).toLocaleString('fr-FR')} €</strong></p>
+          <p>Capital final (reporté de ${values.delaiReport} ans) : <strong>${Math.round(r.valeurFinaleReport).toLocaleString('fr-FR')} €</strong></p>
+          <p style="color: #d9534f;">Coût du report : <strong>- ${Math.round(r.coutDuReport).toLocaleString('fr-FR')} €</strong></p>
+        </div>
+      `;
     }
 
     // --- Envoi de l'email ---
@@ -68,4 +68,4 @@ exports.handler = async function(event) {
       body: JSON.stringify({ error: "Une erreur est survenue lors de l'envoi de l'email." }),
     };
   }
-};
+}
