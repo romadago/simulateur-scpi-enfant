@@ -1,4 +1,4 @@
-// Fichier : netlify/functions/send-simulation.js (Version corrigée)
+// Fichier : netlify/functions/send-simulation.js (Version finale et corrigée)
 
 const { Resend } = require('resend');
 
@@ -13,21 +13,22 @@ exports.handler = async function(event) {
     const { email, values, results, simulatorTitle } = data;
 
     // --- Formatage des résultats pour l'email ---
-    let resultsHtml = '';
-    for (const profil in results) {
-        const r = results[profil];
-        const gainReelStyle = r.gainReel >= 0 ? 'color: #28a745;' : 'color: #d9534f;';
-        
-        resultsHtml += `
-            <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 8px;">
-                <h4 style="margin-top: 0; color: #0056b3;">Profil ${profil}</h4>
-                <p>Capital final (valeur nominale) : <strong>${Math.round(r.valeurNominale).toLocaleString('fr-FR')} €</strong></p>
-                <p>Total de vos versements : <strong>${Math.round(r.totalInvesti).toLocaleString('fr-FR')} €</strong></p>
-                <p>Pouvoir d'achat final (valeur réelle) : <strong>${Math.round(r.valeurReelle).toLocaleString('fr-FR')} €</strong></p>
-                <p style="${gainReelStyle}">Gain réel (après inflation) : <strong>${r.gainReel >= 0 ? '+' : ''} ${Math.round(r.gainReel).toLocaleString('fr-FR')} €</strong></p>
-            </div>
-        `;
-    }
+    const repartitionHtml = `
+        <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 8px;">
+            <h4 style="margin-top: 0; color: #0056b3;">Répartition de votre épargne mensuelle conseillée</h4>
+            <p>Capacité d'épargne estimée : <strong>${Math.round(results.capaciteEpargne).toLocaleString('fr-FR')} € / mois</strong></p>
+            <p>Part sécurisée (${results.pourcentages.securise}%) : <strong>${Math.round(results.repartition.securise).toLocaleString('fr-FR')} € / mois</strong></p>
+            <p>Part dynamique (${results.pourcentages.dynamique}%) : <strong>${Math.round(results.repartition.dynamique).toLocaleString('fr-FR')} € / mois</strong></p>
+        </div>
+    `;
+
+    const projectionHtml = `
+        <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 8px;">
+             <h4 style="margin-top: 0; color: #0056b3;">Projection du capital</h4>
+             <p>En suivant cette stratégie, votre capital dans ${values.dureeProjection} ans est estimé à :</p>
+             <p style="font-size: 20px; font-weight: bold;">${Math.round(results.capitalProjete).toLocaleString('fr-FR')} €</p>
+        </div>
+    `;
 
     // --- Envoi de l'email ---
     await resend.emails.send({
@@ -46,6 +47,7 @@ exports.handler = async function(event) {
             <li><strong>Charges de logement :</strong> ${values.chargesLogement.toLocaleString('fr-FR')} €</li>
             <li><strong>Âge :</strong> ${values.age} ans</li>
             <li><strong>Épargne existante :</strong> ${values.epargneExistante.toLocaleString('fr-FR')} €</li>
+            <li><strong>Horizon de projection :</strong> ${values.dureeProjection} ans</li>
           </ul>
 
           <h3 style="color: #333;">Votre stratégie conseillée :</h3>
