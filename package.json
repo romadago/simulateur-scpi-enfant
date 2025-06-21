@@ -22,6 +22,7 @@
     "react-dom": "^18.2.0",
     "react-promise-suspense": "^0.3.2",
     "resend": "^3.5.0",
+    "selderee": "^0.11.0",
     "tippy.js": "^6.3.7"
   },
   "devDependencies": {
