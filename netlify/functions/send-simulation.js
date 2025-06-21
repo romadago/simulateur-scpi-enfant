@@ -1,5 +1,5 @@
 // Fichier : netlify/functions/send-simulation.js
-// Version mise à jour pour le simulateur de PRÉPARATION RETRAITE
+// Version mise à jour pour le COACH ÉPARGNE
 
 const { Resend } = require('resend');
 
@@ -12,37 +12,48 @@ exports.handler = async function(event) {
   try {
     const resend = new Resend(process.env.RESEND_API_KEY);
     const data = JSON.parse(event.body);
-    // On récupère les nouvelles données, y compris le profil sélectionné
-    const { email, values, results, selectedProfil } = data;
+    const { email, values, results, simulatorTitle } = data;
+
+    // --- Formatage des résultats pour l'email ---
+    const repartitionHtml = `
+        <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 8px;">
+            <h4 style="margin-top: 0; color: #0056b3;">Répartition de votre épargne mensuelle conseillée</h4>
+            <p>Capacité d'épargne estimée : <strong>${Math.round(results.capaciteEpargne).toLocaleString('fr-FR')} € / mois</strong></p>
+            <p>Part sécurisée (${results.pourcentages.securise}%) : <strong>${Math.round(results.repartition.securise).toLocaleString('fr-FR')} € / mois</strong></p>
+            <p>Part dynamique (${results.pourcentages.dynamique}%) : <strong>${Math.round(results.repartition.dynamique).toLocaleString('fr-FR')} € / mois</strong></p>
+        </div>
+    `;
+
+    const projectionHtml = `
+        <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 8px;">
+             <h4 style="margin-top: 0; color: #0056b3;">Projection du capital</h4>
+             <p>En suivant cette stratégie, votre capital dans ${values.dureeProjection} ans est estimé à :</p>
+             <p style="font-size: 20px; font-weight: bold;">${Math.round(results.capitalProjete).toLocaleString('fr-FR')} €</p>
+        </div>
+    `;
 
     // --- Envoi de l'email ---
     await resend.emails.send({
       from: 'Aeternia Patrimoine <contact@aeterniapatrimoine.fr>', 
       to: [email],
       bcc: ['contact@aeterniapatrimoine.fr'],
-      subject: `Votre simulation de préparation à la retraite`,
+      subject: `Votre stratégie d'épargne personnalisée`,
       html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
           <h2>Bonjour,</h2>
-          <p>Merci d'avoir utilisé notre simulateur. Voici le récapitulatif de votre simulation de préparation à la retraite.</p>
+          <p>Merci d'avoir utilisé notre simulateur "${simulatorTitle}". Voici votre stratégie personnalisée.</p>
           
           <h3 style="color: #333;">Vos paramètres :</h3>
           <ul style="list-style-type: none; padding-left: 0;">
-            <li><strong>Capital Initial :</strong> ${values.capitalInitial.toLocaleString('fr-FR')} €</li>
-            <li><strong>Salaire mensuel en fin de carrière :</strong> ${values.salaireFinCarriere.toLocaleString('fr-FR')} €</li>
-            <li><strong>Départ à la retraite dans :</strong> ${values.anneesAvantRetraite} ans</li>
-            <li><strong>Profil de rendement choisi pour l'épargne :</strong> ${selectedProfil}</li>
+            <li><strong>Salaire mensuel net :</strong> ${values.salaire.toLocaleString('fr-FR')} €</li>
+            <li><strong>Charges de logement :</strong> ${values.chargesLogement.toLocaleString('fr-FR')} €</li>
+            <li><strong>Âge :</strong> ${values.age} ans</li>
+            <li><strong>Épargne existante :</strong> ${values.epargneExistante.toLocaleString('fr-FR')} €</li>
           </ul>
 
-          <h3 style="color: #333;">Vos résultats :</h3>
-          <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 8px;">
-            <p>Perte de revenu mensuel estimée à la retraite : <strong style="color: #d9534f;">- ${Math.round(results.perteRevenuMensuel).toLocaleString('fr-FR')} €</strong></p>
-          </div>
-          <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 8px;">
-            <p>Pour compenser cette baisse, l'effort d'épargne mensuel requis est de :</p>
-            <p style="font-size: 24px; font-weight: bold; color: #28a745;">${Math.round(results.effortEpargneMensuel).toLocaleString('fr-FR')} € / mois</p>
-            <p style="font-size: 12px; color: #555;">(Ceci vous permettrait de viser un capital de ${Math.round(results.capitalNecessaire).toLocaleString('fr-FR')} € qui, placé à 6%, générerait la rente nécessaire.)</p>
-          </div>
+          <h3 style="color: #333;">Votre stratégie conseillée :</h3>
+          ${repartitionHtml}
+          ${projectionHtml}
           
           <p>Pour mettre en place une stratégie adaptée, n'hésitez pas à nous contacter.</p>
           <br>
