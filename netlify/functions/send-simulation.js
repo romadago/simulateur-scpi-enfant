@@ -1,10 +1,8 @@
-// Fichier : netlify/functions/send-simulation.js
-// Version mise à jour pour le COACH ÉPARGNE
+// Fichier : netlify/functions/send-simulation.js (Version avec mention légale)
 
 const { Resend } = require('resend');
 
 exports.handler = async function(event) {
-  // Accepter uniquement les requêtes POST
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
@@ -12,7 +10,7 @@ exports.handler = async function(event) {
   try {
     const resend = new Resend(process.env.RESEND_API_KEY);
     const data = JSON.parse(event.body);
-    const { email, values, results, simulatorTitle } = data;
+    const { email, values, results, selectedProfil, simulatorTitle } = data;
 
     // --- Formatage des résultats pour l'email ---
     const repartitionHtml = `
@@ -39,7 +37,7 @@ exports.handler = async function(event) {
       bcc: ['contact@aeterniapatrimoine.fr'],
       subject: `Votre stratégie d'épargne personnalisée`,
       html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px;">
           <h2>Bonjour,</h2>
           <p>Merci d'avoir utilisé notre simulateur "${simulatorTitle}". Voici votre stratégie personnalisée.</p>
           
@@ -57,8 +55,14 @@ exports.handler = async function(event) {
           
           <p>Pour mettre en place une stratégie adaptée, n'hésitez pas à nous contacter.</p>
           <br>
-          <p>Cordialement,</p>
-          <p><strong>L'équipe Aeternia Patrimoine</strong></p>
+          <p>Cordialement,<br>L'équipe Aeternia Patrimoine</p>
+
+          <hr style="border: none; border-top: 1px solid #eee; margin-top: 20px;">
+
+          /* --- MODIFICATION : Ajout de la mention légale --- */
+          <p style="font-size: 10px; color: #777; text-align: center; margin-top: 20px;">
+            Les informations et résultats fournis par ce simulateur sont donnés à titre indicatif et non contractuel. Ils ne constituent pas un conseil en investissement et sont basés sur les hypothèses que vous avez renseignées.
+          </p>
         </div>
       `,
     });
