@@ -1,6 +1,0 @@
-{
-  "type": "module",
-  "dependencies": {
-    "resend": "^3.5.0"
-  }
-}
