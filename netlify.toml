@@ -4,8 +4,8 @@
 
 [functions]
   node_bundler = "esbuild"
-  external_node_modules = ["resend", "@react-email/render", "html-to-text", "js-beautify", "prettier", "deepmerge", "config-chain", "editorconfig", "dom-serializer", "@selderee/plugin-htmlparser2", "selderee"]
+  included_files = ["netlify/functions/send-simulation-bundled.js"]
 
 [build.environment]
   NODE_VERSION = "18"
-  NPM_FLAGS = "--version"  # forcera pnpm si pnpm-lock.yaml est détecté
+  NPM_FLAGS = "--version"

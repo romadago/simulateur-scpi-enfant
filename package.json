@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "bundle": "node bundle-functions.js",
+    "build": "pnpm bundle && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
@@ -20,6 +21,7 @@
     "@types/react-dom": "^18.2.22",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.21",
+    "esbuild": "^0.25.5",
     "eslint": "^8.57.0",
     "postcss": "^8.5.5",
     "tailwindcss": "^3.4.17",
