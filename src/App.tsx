@@ -24,18 +24,16 @@ interface Parametre {
   tooltip: string;
 }
 
-interface ProfileResult {
-  valeurNominale: number;
-  valeurReelle: number;
-  totalInvesti: number;
-  gainReel: number;
+interface Results {
+  perteRevenuMensuel: number;
+  effortEpargneMensuel: number;
+  capitalNecessaire: number;
 }
 
 const initialValues = {
   capitalInitial: 10000,
-  versementMensuel: 300,
-  dureePlacement: 20,
-  tauxInflation: 3,
+  salaireFinCarriere: 5000,
+  anneesAvantRetraite: 15,
 };
 
 type ProfilName = 'Prudent' | 'Équilibré' | 'Dynamique';
@@ -46,47 +44,27 @@ const profils: Record<ProfilName, number> = {
   Dynamique: 0.08,
 };
 
-const profilStyles: Record<ProfilName, { card: string; title: string; label: string; value: string; gainPositif: string; gainNegatif: string; border: string; }> = {
-  Prudent: {
-    card: 'bg-sky-100',
-    title: 'text-sky-900',
-    label: 'text-sky-700',
-    value: 'text-sky-900 font-semibold',
-    gainPositif: 'text-green-600',
-    gainNegatif: 'text-red-600',
-    border: 'border-sky-200'
-  },
-  'Équilibré': {
-    card: 'bg-emerald-100',
-    title: 'text-emerald-900',
-    label: 'text-emerald-700',
-    value: 'text-emerald-900 font-semibold',
-    gainPositif: 'text-green-600',
-    gainNegatif: 'text-red-600',
-    border: 'border-emerald-200'
-  },
-  Dynamique: {
-    card: 'bg-rose-100',
-    title: 'text-rose-900',
-    label: 'text-rose-700',
-    value: 'text-rose-900 font-semibold',
-    gainPositif: 'text-green-600',
-    gainNegatif: 'text-red-600',
-    border: 'border-rose-200'
-  }
+const profilStyles: Record<ProfilName, { bg: string; text: string; ring: string }> = {
+    Prudent: { bg: 'bg-sky-100', text: 'text-sky-800', ring: 'ring-sky-400' },
+    'Équilibré': { bg: 'bg-emerald-100', text: 'text-emerald-800', ring: 'ring-emerald-400' },
+    Dynamique: { bg: 'bg-rose-100', text: 'text-rose-800', ring: 'ring-rose-400' },
 };
 
 const App: React.FC = () => {
   const [values, setValues] = useState(initialValues);
-  const [results, setResults] = useState<Partial<Record<ProfilName, ProfileResult>>>({});
+  const [selectedProfil, setSelectedProfil] = useState<ProfilName>('Équilibré');
+  const [results, setResults] = useState<Results>({
+    perteRevenuMensuel: 0,
+    effortEpargneMensuel: 0,
+    capitalNecessaire: 0,
+  });
   const [email, setEmail] = useState('');
   const [emailStatus, setEmailStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
   
   const parametres: Parametre[] = [
     { id: 'capitalInitial', label: 'Capital Initial', unit: '€', min: 0, max: 200000, step: 1000, tooltip: 'La somme que vous investissez au départ.' },
-    { id: 'versementMensuel', label: 'Épargne Mensuelle', unit: '€', min: 0, max: 2000, step: 50, tooltip: 'La somme que vous prévoyez d\'épargner chaque mois.' },
-    { id: 'dureePlacement', label: 'Durée du placement', unit: 'ans', min: 5, max: 40, step: 1, tooltip: 'Le nombre d\'années total pendant lesquelles vous souhaitez épargner.' },
-    { id: 'tauxInflation', label: 'Taux d\'inflation annuel', unit: '%', min: 1, max: 5, step: 0.1, tooltip: 'L\'inflation annuelle moyenne qui réduit votre pouvoir d\'achat.' },
+    { id: 'salaireFinCarriere', label: 'Salaire mensuel net estimé en fin de carrière', unit: '€', min: 2000, max: 30000, step: 250, tooltip: 'Votre dernier salaire mensuel net avant de partir à la retraite.' },
+    { id: 'anneesAvantRetraite', label: 'Vous pensez prendre votre retraite dans', unit: 'ans', min: 5, max: 40, step: 1, tooltip: 'Le nombre d\'années qu\'il vous reste avant votre départ à la retraite.' },
   ];
 
   const calculerValeurFutureVersements = (versementMensuel: number, tauxAnnuel: number, dureeEnAnnees: number): number => {
@@ -102,20 +80,32 @@ const App: React.FC = () => {
   };
   
   useEffect(() => {
-    const nouveauxResultats: Partial<Record<ProfilName, ProfileResult>> = {};
-    const totalVersements = values.versementMensuel * values.dureePlacement * 12;
-    const totalInvesti = values.capitalInitial + totalVersements;
-    for (const entry of Object.entries(profils)) {
-      const [nomProfil, taux] = entry as [ProfilName, number];
-      const fvVersements = calculerValeurFutureVersements(values.versementMensuel, taux, values.dureePlacement);
-      const fvCapitalInitial = calculerValeurFutureCapitalInitial(values.capitalInitial, taux, values.dureePlacement);
-      const valeurNominale = fvVersements + fvCapitalInitial;
-      const valeurReelle = valeurNominale / Math.pow(1 + (values.tauxInflation / 100), values.dureePlacement);
-      const gainReel = valeurReelle - totalInvesti;
-      nouveauxResultats[nomProfil] = { valeurNominale, valeurReelle, totalInvesti, gainReel };
+    const perteRevenuMensuel = values.salaireFinCarriere * 0.60;
+    const perteRevenuAnnuel = perteRevenuMensuel * 12;
+    const tauxRente = 0.06;
+    const capitalNecessaire = perteRevenuAnnuel / tauxRente;
+
+    const tauxPlacement = profils[selectedProfil];
+    const r = tauxPlacement / 12;
+    const n = values.anneesAvantRetraite * 12;
+    
+    // Pour trouver le versement mensuel, on doit soustraire la valeur future du capital initial
+    // de la cible de capital total.
+    const fvCapitalInitial = calculerValeurFutureCapitalInitial(values.capitalInitial, tauxPlacement, values.anneesAvantRetraite);
+    const capitalACreerViaVersements = Math.max(0, capitalNecessaire - fvCapitalInitial);
+    
+    let effortEpargneMensuel = 0;
+    if (r > 0 && capitalACreerViaVersements > 0) {
+      const denominateur = (Math.pow(1 + r, n) - 1) / r;
+      effortEpargneMensuel = capitalACreerViaVersements / denominateur;
     }
-    setResults(nouveauxResultats);
-  }, [values]);
+
+    setResults({
+      perteRevenuMensuel,
+      effortEpargneMensuel,
+      capitalNecessaire,
+    });
+  }, [values, selectedProfil]);
 
   useEffect(() => {
     tippy('[data-tippy-content]', { theme: 'custom', animation: 'scale-subtle' });
@@ -137,7 +127,7 @@ const App: React.FC = () => {
       const response = await fetch('/.netlify/functions/send-simulation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, values, results }),
+        body: JSON.stringify({ email, values, results, selectedProfil, simulatorTitle: "Préparation Retraite" }),
       });
       if (!response.ok) throw new Error("Erreur du serveur lors de l'envoi.");
       setEmailStatus('success');
@@ -153,9 +143,31 @@ const App: React.FC = () => {
       <div className="bg-gradient-to-br from-slate-900 to-slate-700 p-4 sm:p-8 font-sans flex items-center justify-center min-h-screen">
         <div className="bg-slate-800/50 backdrop-blur-sm ring-1 ring-white/10 p-6 sm:p-10 rounded-2xl shadow-2xl w-full max-w-6xl mx-auto">
           
-          <div className="flex items-center justify-center gap-4 mb-10">
+          <div className="flex items-center justify-center gap-4 mb-8">
             <img src="/generique-turquoise.svg" alt="Logo Aeterni Patrimoine" className="w-12 h-12" />
-            <h1 className="text-3xl sm:text-4xl font-bold text-center text-gray-100">Simulateur d'Impact de l'Inflation</h1>
+            <h1 className="text-3xl sm:text-4xl font-bold text-center text-gray-100">
+              Simulateur Préparation Retraite
+            </h1>
+          </div>
+          
+          <div className="mb-8">
+            <h3 className="text-lg font-semibold text-center text-white mb-4">Choisissez un profil de rendement pour votre épargne :</h3>
+            <div className="flex flex-wrap justify-center gap-4">
+                {(Object.keys(profils) as ProfilName[]).map(nomProfil => {
+                    const isActive = selectedProfil === nomProfil;
+                    const styles = profilStyles[nomProfil];
+                    return (
+                        <button
+                            key={nomProfil}
+                            onClick={() => setSelectedProfil(nomProfil)}
+                            className={`px-6 py-3 rounded-lg font-bold transition-all duration-200 ${styles.bg} ${styles.text} ${isActive ? `ring-2 ${styles.ring} shadow-lg` : 'opacity-70 hover:opacity-100'}`}
+                        >
+                            <span className="block text-lg">{nomProfil}</span>
+                            <span className="block text-sm">({profils[nomProfil] * 100}% / an)</span>
+                        </button>
+                    )
+                })}
+            </div>
           </div>
 
           <div className="bg-slate-700/50 p-6 rounded-lg mb-12 ring-1 ring-white/10">
@@ -181,7 +193,6 @@ const App: React.FC = () => {
                     {emailStatus === 'error' && <p className="text-red-400 text-sm mt-2">Une erreur est survenue. Veuillez réessayer.</p>}
                 </form>
 
-                {/* --- MODIFICATION : Ajout d'un conteneur pour les 2 boutons --- */}
                 <div className="text-center">
                      <p className="text-gray-300 font-medium mb-3">Poursuivez votre démarche :</p>
                      <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -193,14 +204,13 @@ const App: React.FC = () => {
                         >
                             Prendre rendez-vous
                         </a>
-                        {/* --- MODIFICATION : Ajout du nouveau bouton --- */}
                         <a
                             href="https://www.aeterniapatrimoine.fr/solutions/"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-block bg-transparent text-[#00FFD2] font-bold py-3 px-6 rounded-md border-2 border-[#00FFD2] hover:bg-[#00FFD2] hover:text-slate-900 transition-colors"
                         >
-                            Nos solutions anti-inflation
+                            Nos solutions retraite
                         </a>
                      </div>
                 </div>
@@ -227,41 +237,18 @@ const App: React.FC = () => {
                 ))}
               </div>
             </div>
-            <div className="bg-slate-700/50 p-6 rounded-lg shadow-inner ring-1 ring-white/10">
-              <h2 className="text-2xl font-semibold text-[#00FFD2] mb-6">Impact de l'Inflation sur votre capital</h2>
-              <div className="space-y-5">
-                {(Object.keys(profils) as ProfilName[]).map(nomProfil => {
-                  const resultData = results[nomProfil];
-                  if (!resultData) return null; 
-                  const styles = profilStyles[nomProfil];
-                  const gainStyle = resultData.gainReel >= 0 ? styles.gainPositif : styles.gainNegatif;
-                  return (
-                    <div key={nomProfil} className={`${styles.card} p-4 rounded-lg shadow-sm`}>
-                      <h3 className={`text-xl font-bold ${styles.title} mb-3`}>{nomProfil} (Rendement { profils[nomProfil] * 100 }%)</h3>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between items-center">
-                          <span className={styles.label}>Capital final (valeur nominale) :</span>
-                          <span className={styles.value}>{resultData.valeurNominale.toLocaleString('fr-FR', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0})}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className={styles.label}>Total de vos versements :</span>
-                          <span className={styles.value}>{resultData.totalInvesti.toLocaleString('fr-FR', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0})}</span>
-                        </div>
-                         <div className="flex justify-between items-center">
-                          <span className={styles.label}>Pouvoir d'achat final (valeur réelle) :</span>
-                          <span className={styles.value}>{resultData.valeurReelle.toLocaleString('fr-FR', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0})}</span>
-                        </div>
-                         <div className={`flex justify-between items-center mt-2 pt-2 border-t ${styles.border} border-dashed`}>
-                          <span className={`font-bold ${gainStyle}`}>Gain réel (après inflation) :</span>
-                          <span className={`font-extrabold ${gainStyle} text-base`}>
-                            {resultData.gainReel >= 0 ? '+ ' : ''}
-                            {resultData.gainReel.toLocaleString('fr-FR', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0})}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
+            <div className="bg-slate-700/50 p-6 rounded-lg shadow-inner ring-1 ring-white/10 flex flex-col justify-center">
+              <div className="space-y-8">
+                <div className="bg-sky-100 p-6 rounded-lg text-center shadow">
+                  <h3 className="text-lg font-semibold text-sky-800 mb-2">Perte de revenu mensuel estimée</h3>
+                  <p className="text-4xl font-bold text-sky-900">- {results.perteRevenuMensuel.toLocaleString('fr-FR', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0})}</p>
+                  <p className="text-xs text-sky-700 mt-1">(Basé sur une pension de 40% de votre dernier salaire)</p>
+                </div>
+                <div className="bg-emerald-100 p-6 rounded-lg text-center shadow">
+                  <h3 className="text-lg font-semibold text-emerald-800 mb-2">Effort d'épargne mensuel requis</h3>
+                  <p className="text-4xl font-bold text-emerald-900">{results.effortEpargneMensuel.toLocaleString('fr-FR', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0})}</p>
+                  <p className="text-xs text-emerald-700 mt-1">(Profil <span className="font-bold">{selectedProfil}</span> pour viser un capital de {results.capitalNecessaire.toLocaleString('fr-FR', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0})})</p>
+                </div>
               </div>
             </div>
           </div>
