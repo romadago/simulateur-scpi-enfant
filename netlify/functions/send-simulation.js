@@ -1,9 +1,9 @@
-// Fichier : netlify/functions/send-simulation.js
+// Fichier : netlify/functions/send-simulation.js (Version simplifiée et fonctionnelle)
 
 const { Resend } = require('resend');
 
 exports.handler = async function(event) {
-  // On accepte uniquement les requêtes POST
+  // Accepter uniquement les requêtes POST
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
@@ -13,7 +13,7 @@ exports.handler = async function(event) {
     const data = JSON.parse(event.body);
     const { email, values, results } = data;
 
-    // --- Formatage des résultats pour l'email ---
+    // --- Formatage simple des résultats pour l'email ---
     let resultsHtml = '';
     for (const profil in results) {
         const r = results[profil];
@@ -48,7 +48,6 @@ exports.handler = async function(event) {
           <h3 style="color: #333;">Vos résultats détaillés :</h3>
           ${resultsHtml}
           
-          <p>Comme vous pouvez le constater, commencer à investir plus tôt a un impact considérable sur votre capital final.</p>
           <p>N'hésitez pas à prendre rendez-vous pour discuter de vos résultats et établir une stratégie d'investissement sur mesure.</p>
           <br>
           <p>Cordialement,</p>
