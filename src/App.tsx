@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
+import { Pie } from 'react-chartjs-2';
 import tippy from 'tippy.js';
 import 'tippy.js/dist/tippy.css';
 import 'tippy.js/themes/light.css';
+
+ChartJS.register(ArcElement, Tooltip, Legend);
 
 const tippyCustomTheme = `
   .tippy-box[data-theme~='custom'] {
@@ -25,87 +29,78 @@ interface Parametre {
 }
 
 interface Results {
-  perteRevenuMensuel: number;
-  effortEpargneMensuel: number;
-  capitalNecessaire: number;
+  capaciteEpargne: number;
+  repartition: {
+    securise: number;
+    dynamique: number;
+  };
+  pourcentages: {
+    securise: number;
+    dynamique: number;
+  };
+  objectifPrecaution: number;
+  capitalProjete: number;
 }
 
 const initialValues = {
-  capitalInitial: 10000,
-  salaireFinCarriere: 5000,
-  anneesAvantRetraite: 15,
-};
-
-type ProfilName = 'Prudent' | 'Équilibré' | 'Dynamique';
-
-const profils: Record<ProfilName, number> = {
-  Prudent: 0.04,
-  'Équilibré': 0.06,
-  Dynamique: 0.08,
-};
-
-const profilStyles: Record<ProfilName, { bg: string; text: string; ring: string }> = {
-    Prudent: { bg: 'bg-sky-100', text: 'text-sky-800', ring: 'ring-sky-400' },
-    'Équilibré': { bg: 'bg-emerald-100', text: 'text-emerald-800', ring: 'ring-emerald-400' },
-    Dynamique: { bg: 'bg-rose-100', text: 'text-rose-800', ring: 'ring-rose-400' },
+  salaire: 4000,
+  chargesLogement: 1200,
+  age: 35,
+  epargneExistante: 5000,
+  dureeProjection: 10,
 };
 
 const App: React.FC = () => {
   const [values, setValues] = useState(initialValues);
-  const [selectedProfil, setSelectedProfil] = useState<ProfilName>('Équilibré');
   const [results, setResults] = useState<Results>({
-    perteRevenuMensuel: 0,
-    effortEpargneMensuel: 0,
-    capitalNecessaire: 0,
+    capaciteEpargne: 0,
+    repartition: { securise: 0, dynamique: 0 },
+    pourcentages: { securise: 0, dynamique: 0 },
+    objectifPrecaution: 0,
+    capitalProjete: 0,
   });
   const [email, setEmail] = useState('');
   const [emailStatus, setEmailStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
   
   const parametres: Parametre[] = [
-    { id: 'capitalInitial', label: 'Capital Initial', unit: '€', min: 0, max: 200000, step: 1000, tooltip: 'La somme que vous investissez au départ.' },
-    { id: 'salaireFinCarriere', label: 'Salaire mensuel net estimé en fin de carrière', unit: '€', min: 2000, max: 30000, step: 250, tooltip: 'Votre dernier salaire mensuel net avant de partir à la retraite.' },
-    { id: 'anneesAvantRetraite', label: 'Vous pensez prendre votre retraite dans', unit: 'ans', min: 5, max: 40, step: 1, tooltip: 'Le nombre d\'années qu\'il vous reste avant votre départ à la retraite.' },
+    { id: 'salaire', label: 'Votre salaire mensuel net', unit: '€', min: 1500, max: 15000, step: 100, tooltip: 'Votre revenu mensuel net après impôts.' },
+    { id: 'chargesLogement', label: 'Vos charges de logement mensuelles', unit: '€', min: 200, max: 5000, step: 50, tooltip: 'Loyer ou remboursement de prêt, charges de copropriété, etc.' },
+    { id: 'age', label: 'Votre âge', unit: 'ans', min: 18, max: 70, step: 1, tooltip: 'Votre âge est un facteur clé pour déterminer votre profil de risque.' },
+    { id: 'epargneExistante', label: 'Votre épargne déjà constituée', unit: '€', min: 0, max: 500000, step: 1000, tooltip: 'Le montant total de votre épargne actuelle, tous comptes confondus.' },
+    { id: 'dureeProjection', label: 'Estimer mon capital obtenu dans', unit: 'ans', min: 5, max: 40, step: 1, tooltip: 'Choisissez un horizon de temps pour estimer la croissance de votre épargne.' },
   ];
-
+  
   const calculerValeurFutureVersements = (versementMensuel: number, tauxAnnuel: number, dureeEnAnnees: number): number => {
-    if (versementMensuel <= 0) return 0;
+    if (versementMensuel <= 0 || dureeEnAnnees <= 0) return 0;
     const tauxMensuel = tauxAnnuel / 12;
     const nombreDeMois = dureeEnAnnees * 12;
     return versementMensuel * (Math.pow(1 + tauxMensuel, nombreDeMois) - 1) / tauxMensuel;
   };
 
-  const calculerValeurFutureCapitalInitial = (capital: number, tauxAnnuel: number, dureeEnAnnees: number): number => {
-    if (capital <= 0) return 0;
-    return capital * Math.pow(1 + tauxAnnuel, dureeEnAnnees);
-  };
-  
   useEffect(() => {
-    const perteRevenuMensuel = values.salaireFinCarriere * 0.60;
-    const perteRevenuAnnuel = perteRevenuMensuel * 12;
-    const tauxRente = 0.06;
-    const capitalNecessaire = perteRevenuAnnuel / tauxRente;
-
-    const tauxPlacement = profils[selectedProfil];
-    const r = tauxPlacement / 12;
-    const n = values.anneesAvantRetraite * 12;
-    
-    // Pour trouver le versement mensuel, on doit soustraire la valeur future du capital initial
-    // de la cible de capital total.
-    const fvCapitalInitial = calculerValeurFutureCapitalInitial(values.capitalInitial, tauxPlacement, values.anneesAvantRetraite);
-    const capitalACreerViaVersements = Math.max(0, capitalNecessaire - fvCapitalInitial);
-    
-    let effortEpargneMensuel = 0;
-    if (r > 0 && capitalACreerViaVersements > 0) {
-      const denominateur = (Math.pow(1 + r, n) - 1) / r;
-      effortEpargneMensuel = capitalACreerViaVersements / denominateur;
-    }
+    const autresDepenses = values.salaire * 0.30;
+    const depensesTotales = values.chargesLogement + autresDepenses;
+    const revenuDisponible = values.salaire - depensesTotales;
+    const capaciteEpargne = Math.max(0, revenuDisponible * 0.5);
+    const objectifPrecaution = depensesTotales * 3;
+    const pourcentageDynamique = Math.max(0, 100 - values.age);
+    const pourcentageSecurise = 100 - pourcentageDynamique;
+    const repartition = {
+      dynamique: capaciteEpargne * (pourcentageDynamique / 100),
+      securise: capaciteEpargne * (pourcentageSecurise / 100),
+    };
+    const fvSecurise = calculerValeurFutureVersements(repartition.securise, 0.04, values.dureeProjection);
+    const fvDynamique = calculerValeurFutureVersements(repartition.dynamique, 0.08, values.dureeProjection);
+    const capitalProjete = fvSecurise + fvDynamique;
 
     setResults({
-      perteRevenuMensuel,
-      effortEpargneMensuel,
-      capitalNecessaire,
+      capaciteEpargne,
+      repartition,
+      pourcentages: { securise: pourcentageSecurise, dynamique: pourcentageDynamique },
+      objectifPrecaution,
+      capitalProjete,
     });
-  }, [values, selectedProfil]);
+  }, [values]);
 
   useEffect(() => {
     tippy('[data-tippy-content]', { theme: 'custom', animation: 'scale-subtle' });
@@ -127,7 +122,7 @@ const App: React.FC = () => {
       const response = await fetch('/.netlify/functions/send-simulation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, values, results, selectedProfil, simulatorTitle: "Préparation Retraite" }),
+        body: JSON.stringify({ email, values, results, simulatorTitle: "Coach Épargne" }),
       });
       if (!response.ok) throw new Error("Erreur du serveur lors de l'envoi.");
       setEmailStatus('success');
@@ -137,44 +132,33 @@ const App: React.FC = () => {
     }
   };
 
+  const chartData = {
+    labels: ['Épargne Sécurisée', 'Épargne Dynamique'],
+    datasets: [{ data: [results.pourcentages.securise, results.pourcentages.dynamique], backgroundColor: ['#3b82f6', '#10b981'], borderColor: '#1f2937', borderWidth: 4 }],
+  };
+  const chartOptions = {
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: (context: any) => `${context.label}: ${context.raw}%` } } },
+    responsive: true, maintainAspectRatio: false,
+  };
+
   return (
     <>
       <style>{tippyCustomTheme}</style>
       <div className="bg-gradient-to-br from-slate-900 to-slate-700 p-4 sm:p-8 font-sans flex items-center justify-center min-h-screen">
         <div className="bg-slate-800/50 backdrop-blur-sm ring-1 ring-white/10 p-6 sm:p-10 rounded-2xl shadow-2xl w-full max-w-6xl mx-auto">
           
-          <div className="flex items-center justify-center gap-4 mb-8">
+          <div className="flex items-center justify-center gap-4 mb-10">
             <img src="/generique-turquoise.svg" alt="Logo Aeterni Patrimoine" className="w-12 h-12" />
             <h1 className="text-3xl sm:text-4xl font-bold text-center text-gray-100">
-              Simulateur Préparation Retraite
+              Coach Épargne : Répartition Optimisée
             </h1>
           </div>
           
-          <div className="mb-8">
-            <h3 className="text-lg font-semibold text-center text-white mb-4">Choisissez un profil de rendement pour votre épargne :</h3>
-            <div className="flex flex-wrap justify-center gap-4">
-                {(Object.keys(profils) as ProfilName[]).map(nomProfil => {
-                    const isActive = selectedProfil === nomProfil;
-                    const styles = profilStyles[nomProfil];
-                    return (
-                        <button
-                            key={nomProfil}
-                            onClick={() => setSelectedProfil(nomProfil)}
-                            className={`px-6 py-3 rounded-lg font-bold transition-all duration-200 ${styles.bg} ${styles.text} ${isActive ? `ring-2 ${styles.ring} shadow-lg` : 'opacity-70 hover:opacity-100'}`}
-                        >
-                            <span className="block text-lg">{nomProfil}</span>
-                            <span className="block text-sm">({profils[nomProfil] * 100}% / an)</span>
-                        </button>
-                    )
-                })}
-            </div>
-          </div>
-
           <div className="bg-slate-700/50 p-6 rounded-lg mb-12 ring-1 ring-white/10">
             <h2 className="text-2xl font-semibold text-center text-white mb-6">Passez à l'action</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                 <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-                    <label htmlFor="email" className="text-gray-300 font-medium">Recevez cette simulation détaillée par email :</label>
+                    <label htmlFor="email" className="text-gray-300 font-medium">Recevez cette stratégie personnalisée par email :</label>
                     <div className="flex gap-2">
                         <input
                             type="email"
@@ -189,37 +173,28 @@ const App: React.FC = () => {
                             {emailStatus === 'sending' ? 'Envoi...' : 'Envoyer'}
                         </button>
                     </div>
-                    {emailStatus === 'success' && <p className="text-green-400 text-sm mt-2">Simulation envoyée avec succès !</p>}
+                    {emailStatus === 'success' && <p className="text-green-400 text-sm mt-2">Stratégie envoyée avec succès !</p>}
                     {emailStatus === 'error' && <p className="text-red-400 text-sm mt-2">Une erreur est survenue. Veuillez réessayer.</p>}
                 </form>
 
                 <div className="text-center">
                      <p className="text-gray-300 font-medium mb-3">Poursuivez votre démarche :</p>
                      <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                        <a
-                            href="https://doodle.com/bp/romaindagnano/rdv-decouverte-aeternia"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-block bg-white text-slate-900 font-bold py-3 px-6 rounded-md hover:bg-[#00FFD2] transition-colors"
-                        >
-                            Prendre rendez-vous
+                        <a href="https://www.aeterniapatrimoine.fr/solutions/" target="_blank" rel="noopener noreferrer" className="inline-block bg-transparent text-[#00FFD2] font-bold py-3 px-6 rounded-md border-2 border-[#00FFD2] hover:bg-[#00FFD2] hover:text-slate-900 transition-colors">
+                            Nos solutions
                         </a>
-                        <a
-                            href="https://www.aeterniapatrimoine.fr/solutions/"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-block bg-transparent text-[#00FFD2] font-bold py-3 px-6 rounded-md border-2 border-[#00FFD2] hover:bg-[#00FFD2] hover:text-slate-900 transition-colors"
-                        >
-                            Nos solutions retraite
+                        <a href="https://doodle.com/bp/romaindagnano/rdv-decouverte-aeternia" target="_blank" rel="noopener noreferrer" className="inline-block bg-white text-slate-900 font-bold py-3 px-6 rounded-md hover:bg-[#00FFD2] transition-colors">
+                            Prendre rendez-vous
                         </a>
                      </div>
                 </div>
             </div>
           </div>
 
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
             <div className="bg-slate-700/50 p-6 rounded-lg shadow-inner ring-1 ring-white/10">
-              <h2 className="text-2xl font-semibold text-[#00FFD2] mb-6">Vos Paramètres</h2>
+              <h2 className="text-2xl font-semibold text-[#00FFD2] mb-6">Votre Situation</h2>
               <div className="space-y-6">
                 {parametres.map((p) => (
                   <div key={p.id}>
@@ -237,20 +212,56 @@ const App: React.FC = () => {
                 ))}
               </div>
             </div>
-            <div className="bg-slate-700/50 p-6 rounded-lg shadow-inner ring-1 ring-white/10 flex flex-col justify-center">
-              <div className="space-y-8">
-                <div className="bg-sky-100 p-6 rounded-lg text-center shadow">
-                  <h3 className="text-lg font-semibold text-sky-800 mb-2">Perte de revenu mensuel estimée</h3>
-                  <p className="text-4xl font-bold text-sky-900">- {results.perteRevenuMensuel.toLocaleString('fr-FR', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0})}</p>
-                  <p className="text-xs text-sky-700 mt-1">(Basé sur une pension de 40% de votre dernier salaire)</p>
-                </div>
-                <div className="bg-emerald-100 p-6 rounded-lg text-center shadow">
-                  <h3 className="text-lg font-semibold text-emerald-800 mb-2">Effort d'épargne mensuel requis</h3>
-                  <p className="text-4xl font-bold text-emerald-900">{results.effortEpargneMensuel.toLocaleString('fr-FR', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0})}</p>
-                  <p className="text-xs text-emerald-700 mt-1">(Profil <span className="font-bold">{selectedProfil}</span> pour viser un capital de {results.capitalNecessaire.toLocaleString('fr-FR', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0})})</p>
+            
+            <div className="bg-slate-700/50 p-6 rounded-lg shadow-inner ring-1 ring-white/10">
+              <h2 className="text-2xl font-semibold text-[#00FFD2] mb-4">Votre Stratégie d'Épargne Conseillée</h2>
+              <div className="text-center bg-slate-900/50 p-4 rounded-lg mb-4">
+                  <p className="text-gray-300">Votre capacité d'épargne mensuelle est estimée à :</p>
+                  <p className="text-3xl font-bold text-white my-2">{results.capaciteEpargne.toLocaleString('fr-FR', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0})}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4 items-center mb-4">
+                <div className="h-48 md:h-56 relative"><Pie data={chartData} options={chartOptions} /></div>
+                <div className="space-y-4">
+                    <div>
+                        <p className="text-sm text-blue-300">Épargne Sécurisée ({results.pourcentages.securise}%)</p>
+                        <p className="text-xl font-bold text-white">{results.repartition.securise.toLocaleString('fr-FR', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0})} / mois</p>
+                    </div>
+                     <div>
+                        <p className="text-sm text-green-300">Épargne Dynamique ({results.pourcentages.dynamique}%)</p>
+                        <p className="text-xl font-bold text-white">{results.repartition.dynamique.toLocaleString('fr-FR', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0})} / mois</p>
+                    </div>
                 </div>
               </div>
+
+              {/* --- MODIFICATION : Bloc de projection réintégré --- */}
+              <div className="mt-4 text-center bg-gradient-to-r from-cyan-500/20 to-teal-500/20 p-4 rounded-lg border border-cyan-400/30">
+                <h4 className="font-semibold text-cyan-200">Projection de votre patrimoine</h4>
+                <p className="text-gray-300 mt-1">
+                  En suivant cette stratégie, votre capital est estimé à :
+                </p>
+                <p className="text-3xl font-bold text-white my-2">
+                    {results.capitalProjete.toLocaleString('fr-FR', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0})}
+                </p>
+                 <p className="text-xs text-gray-400">dans {values.dureeProjection} ans</p>
+              </div>
+
+              <div className="mt-4 text-center bg-sky-100/10 p-3 rounded-lg border border-sky-200/20">
+                <h4 className="font-semibold text-sky-200">Conseil pour votre Épargne de Précaution</h4>
+                <p className="text-xs text-gray-300 mt-1">
+                  Votre objectif est d'environ {results.objectifPrecaution.toLocaleString('fr-FR', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0})}.
+                  {values.epargneExistante < results.objectifPrecaution 
+                    ? ` Il vous manque encore ${(results.objectifPrecaution - values.epargneExistante).toLocaleString('fr-FR', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0})}. Pensez à y allouer une partie de votre épargne en priorité.`
+                    : ` Bravo, votre matelas de sécurité est constitué !`
+                  }
+                </p>
+              </div>
             </div>
+          </div>
+          
+           <div className="mt-10 text-center">
+            <p className="text-xs text-gray-500">
+              Les informations et résultats fournis par ce simulateur sont donnés à titre indicatif et non contractuel. Ils ne constituent pas un conseil en investissement et sont basés sur les hypothèses que vous avez renseignées.
+            </p>
           </div>
         </div>
       </div>
