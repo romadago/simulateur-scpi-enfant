@@ -1,5 +1,5 @@
 // Fichier : netlify/functions/send-simulation.js
-// Version pour le Simulateur d'Épargne Objectif
+// Version finale avec la mention légale dans l'email
 
 const { Resend } = require('resend');
 
@@ -12,6 +12,7 @@ exports.handler = async function(event) {
   try {
     const resend = new Resend(process.env.RESEND_API_KEY);
     const data = JSON.parse(event.body);
+    // On récupère les données du simulateur d'épargne objectif
     const { email, values, results } = data;
 
     // --- Formatage des résultats pour l'email ---
@@ -52,6 +53,12 @@ exports.handler = async function(event) {
           <br>
           <p>Cordialement,</p>
           <p><strong>L'équipe Aeternia Patrimoine</strong></p>
+
+          <hr style="border: none; border-top: 1px solid #eee; margin-top: 20px;">
+          
+          <p style="font-size: 10px; color: #777; text-align: center; margin-top: 20px;">
+            Les informations et résultats fournis par ce simulateur sont donnés à titre indicatif et non contractuel. Ils ne constituent pas un conseil en investissement et sont basés sur les hypothèses que vous avez renseignées.
+          </p>
         </div>
       `,
     });
