@@ -55,12 +55,12 @@ const App: React.FC = () => {
   
   // --- State for email form ---
   const [email, setEmail] = useState('');
+  const [isSending, setIsSending] = useState(false);
   const [emailMessage, setEmailMessage] = useState('');
 
 
   // --- Simulation Engine ---
   useEffect(() => {
-    // This is the core simulation function. It calculates the final capital.
     const runSimulation = (versementMensuelCible: number, generateChart: boolean = false): number | any[] => {
       const monthlyRate = TAUX_DISTRIBUTION_SCPI / 12;
       const totalMonths = dureePlacement * 12;
@@ -141,22 +141,49 @@ const App: React.FC = () => {
   }, [revenuRecherche, dureePlacement, versementInitial]);
   
   // --- Email form handler ---
-  const handleEmailSubmit = (e: React.FormEvent) => {
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email && /\S+@\S+\.\S+/.test(email)) {
-        // In a real application, you would send the data to a backend service here.
-        console.log({
-            email: email,
-            simulation: {
-                ...results,
-                chartData
-            }
+    if (!email || !/\S+@\S+\.\S+/.test(email)) {
+        setEmailMessage('Veuillez saisir une adresse e-mail valide.');
+        return;
+    }
+
+    setIsSending(true);
+    setEmailMessage('');
+
+    const simulationData = {
+        objectifs: {
+            revenuRecherche: `${revenuRecherche.toLocaleString('fr-FR')} €`,
+            dureePlacement: `${dureePlacement} ans`,
+            versementInitial: `${versementInitial.toLocaleString('fr-FR')} €`,
+        },
+        resultats: {
+            versementMensuelRequis: `${results.versementMensuelRequis.toLocaleString('fr-FR', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0})}`,
+            capitalVise: `${results.capitalVise.toLocaleString('fr-FR', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0})}`,
+        }
+    };
+
+    try {
+        // This is the call to the Netlify serverless function
+        const response = await fetch('/.netlify/functions/send-simulation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, data: simulationData }),
         });
+
+        if (!response.ok) {
+            throw new Error('La réponse du serveur n\'est pas OK.');
+        }
+
         setEmailMessage(`Votre simulation a bien été envoyée à ${email}.`);
         setEmail('');
-        setTimeout(() => setEmailMessage(''), 5000); // Clear message after 5 seconds
-    } else {
-        setEmailMessage('Veuillez saisir une adresse e-mail valide.');
+
+    } catch (error) {
+        console.error('Failed to send simulation:', error);
+        setEmailMessage("Une erreur est survenue. Veuillez réessayer.");
+    } finally {
+        setIsSending(false);
+        setTimeout(() => setEmailMessage(''), 5000);
     }
   };
 
@@ -172,7 +199,6 @@ const App: React.FC = () => {
             <p className="text-slate-300 mt-2">Découvrez l'effort d'épargne mensuel pour générer le revenu mensuel nécessaire.</p>
         </div>
         
-        {/* Main Content: Controls + Result & Actions */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 lg:gap-12 mb-12">
             {/* Left Column: Controls */}
             <div className="lg:col-span-2 bg-slate-700/50 p-6 rounded-lg shadow-inner ring-1 ring-white/10">
@@ -225,7 +251,6 @@ const App: React.FC = () => {
 
                 <hr className="my-8 border-slate-600" />
                 
-                {/* Email Form and CTAs */}
                 <div className="text-center">
                      <h3 className="text-lg font-semibold text-gray-100 mb-3">Passez à l'étape suivante</h3>
                      <form onSubmit={handleEmailSubmit} className="flex flex-col sm:flex-row gap-2 mb-4">
@@ -233,12 +258,13 @@ const App: React.FC = () => {
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            placeholder="Recevoir par e-mail"
+                            placeholder="Votre adresse e-mail"
                             className="flex-grow bg-slate-800 text-white placeholder-slate-400 border border-slate-600 rounded-lg py-3 px-4 focus:outline-none focus:ring-2 focus:ring-[#00FFD2]"
                             required
+                            disabled={isSending}
                         />
-                        <button type="submit" className="bg-slate-600 text-white font-bold py-3 px-5 rounded-lg hover:bg-slate-500 transition-colors duration-300">
-                            Envoyer
+                        <button type="submit" className="bg-slate-600 text-white font-bold py-3 px-5 rounded-lg hover:bg-slate-500 transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed" disabled={isSending}>
+                            {isSending ? 'Envoi...' : 'Recevoir par e-mail'}
                         </button>
                     </form>
                     {emailMessage && <p className="text-sm text-emerald-400 mb-4">{emailMessage}</p>}
@@ -263,7 +289,7 @@ const App: React.FC = () => {
                     <LineChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
                         <XAxis dataKey="annee" stroke="#94a3b8" unit=" ans" />
-                        <YAxis stroke="#94a3b8" tickFormatter={(value) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value as number)} />
+                        <YAxis stroke="#94a3b8" tickFormatter={(value: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value)} />
                         <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', color: '#e2e8f0' }} formatter={(value: number) => value.toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €'} />
                         <Legend wrapperStyle={{ color: '#e2e8f0' }} />
                         <ReferenceLine y={results.capitalVise} label={{ value: 'Objectif', position: 'insideTopLeft', fill: '#f0f9ff' }} stroke="#f0f9ff" strokeDasharray="3 3" />
